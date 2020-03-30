@@ -63,6 +63,7 @@ DMA_HandleTypeDef hdma_spi1_tx;
 TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
 
@@ -101,38 +102,18 @@ ST7735_DrawFastHLine(0, h, w, ST7735_BLUE);
 ST7735_DrawFastVLine(0, 0, h, ST7735_BLUE);
 ST7735_DrawFastVLine(w, 0, h, ST7735_BLUE);
 
-//ST7735_DrawLine(0, 0, w, 0, ST7735_WHITE); // верх
-//ST7735_DrawLine(0, 0, 0, h, ST7735_WHITE); // лева�?
-//ST7735_DrawLine(w, 0, w, h, ST7735_WHITE); // права�?
-//ST7735_DrawLine(0, h, w, h, ST7735_WHITE); // низ
-
-
-//ST7735_DrawLine(ST7735_GetWidth(),ST7735_GetHeight(), 0, ST7735_GetWidth(), ST7735_RED);
-
-//ST7735_DrawLine(0, 0, ST7735_GetWidth(), ST7735_GetHeight(), ST7735_WHITE);
-//ST7735_DrawLine(ST7735_GetWidth(), 0, 0, ST7735_GetHeight(), ST7735_WHITE);
-
-//printo("\n 123.45f =", bank4);
 
 sprintf(strtxt,"BUFFER %li",pcnt);
 
 ST7735_DrawString(2, 2, strtxt, Font_7x10, ST7735_RED, ST7735_BLACK);
-
-//sprintf(strtxt2,ByteToHex("0123"));
-
-// sprintf(strtxt,"LEN: %i %s",sizeof(strtxt2), strtxt2);
-
 ST7735_DrawString(2, 12, UserRxBufferFS, Font_7x10, ST7735_WHITE, ST7735_BLACK);
 
 sprintf(strtxt,"RCVSTAT:  %i ",rcvuart);
 ST7735_DrawString(2, 32, strtxt, Font_7x10, ST7735_GREEN, ST7735_BLACK);
 
-
 //if (rcvuart == HAL_OK)
 {
-
-
-	sprintf(strtxt,"BATT:  %.2f ",bat);
+sprintf(strtxt,"BATT:  %.2f ",bat);
 ST7735_DrawString(2, 42, strtxt, Font_7x10, ST7735_WHITE, ST7735_BLACK);
 
 sprintf(strtxt,"BANK4: %.2f ",bank4);
@@ -152,13 +133,6 @@ ST7735_DrawString(2, 82, strtxt, Font_7x10, ST7735_WHITE, ST7735_BLACK);
 {
 
 ST7735_DrawString(2, 92, "|ID| B4 | B3 |", Font_7x10, ST7735_WHITE, ST7735_BLACK);
-//printf(strtxt,"|%02x|%02x%02x|%02x%02x|",
-//			(uint16_t) UserRxBufferFS[1],
-//			(uint16_t) UserRxBufferFS[2],
-//			(uint16_t) UserRxBufferFS[3],
-//			(uint16_t) UserRxBufferFS[14],
-//			(uint16_t) UserRxBufferFS[15]);
-
 sprintf(strtxt,"|%02x|%02x%02x|%02x%02x|",
 			(uint16_t) UserRxBufferFS[1],
 			(uint16_t) UserRxBufferFS[2],
@@ -187,15 +161,6 @@ ST7735_DrawString(2, 142, strtxt, Font_7x10, ST7735_WHITE, ST7735_BLACK);
 
 }
 }
-
-
-
-
-// ST7735_DrawString(2, 100, strtxt2, Font_7x10, ST7735_WHITE, ST7735_BLACK);
-
-//ST7735_DrawString(0, 3*10, "Font_11x18, green, lorem ipsum", Font_11x18, ST7735_GREEN, ST7735_BLACK);
-//ST7735_DrawString(0, 3*10+3*18, "Font_16x26", Font_16x26, ST7735_BLUE, ST7735_BLACK);
-
 }
 
 
@@ -203,15 +168,12 @@ void calcBattery(void)
 {
 int8_t shiftAddress=0;
 if (UserRxBufferFS[0]==90)
-//if (rcvuart)
-   {
-	  bat  =0.0f +  (((UserRxBufferFS[03+shiftAddress]<<8) + UserRxBufferFS[02+shiftAddress]) / 57.8);
-	  bank4=0.0f +  (((UserRxBufferFS[13+shiftAddress]<<8) + UserRxBufferFS[12+shiftAddress]) / 58.4);
-	  bank3=0.0f +  (((UserRxBufferFS[15+shiftAddress]<<8) + UserRxBufferFS[14+shiftAddress]) / 58.4);
-	  bank2=0.0f +  (((UserRxBufferFS[17+shiftAddress]<<8) + UserRxBufferFS[16+shiftAddress]) / 57.4);
-	  bank1=0.0f + (((UserRxBufferFS[19+shiftAddress]<<8) + UserRxBufferFS[18+shiftAddress]) / 58.1);
-
-//	  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+   {  // при включении FreeRTOS вся библиотека float для sprintf ломается. Использовать LH יдля вывода float
+	  bat  = (((UserRxBufferFS[03+shiftAddress]<<8) + UserRxBufferFS[02+shiftAddress]) / 57.8);
+	  bank4= (((UserRxBufferFS[13+shiftAddress]<<8) + UserRxBufferFS[12+shiftAddress]) / 58.4);
+	  bank3= (((UserRxBufferFS[15+shiftAddress]<<8) + UserRxBufferFS[14+shiftAddress]) / 58.4);
+	  bank2= (((UserRxBufferFS[17+shiftAddress]<<8) + UserRxBufferFS[16+shiftAddress]) / 57.4);
+	  bank1= (((UserRxBufferFS[19+shiftAddress]<<8) + UserRxBufferFS[18+shiftAddress]) / 58.1);
    }
 
 
@@ -219,39 +181,17 @@ if (UserRxBufferFS[0]==90)
 }
 
 
-uint8_t ll=0;
-
 void readUART(void)
 {
 	pcnt++;
-	//	if (huart1.gState==HAL_UART_STATE_READY)
 	if (rcvuart>0)   for (uint8_t t=0; t<APP_RX_DATA_SIZE; t++) UserRxBufferFS[t]=0; //clear buffer
-    //HAL_UART_Receive_DMA(&huart1, UserRxBufferFS, APP_RX_DATA_SIZE+1);
 
-	//while (!UserRxBufferFS[0]==90)
-	{
-		rcvuart = HAL_UART_Receive(&huart1, UserRxBufferFS, APP_RX_DATA_SIZE,120);
-		//rcvuart = HAL_UART_Receive_IT(&huart1, UserRxBufferFS, APP_RX_DATA_SIZE);
-		//rcvuart = HAL_UART_Receive_DMA(&huart1, UserRxBufferFS, APP_RX_DATA_SIZE);
-		if (ll>10) { HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);ll=0;}
-		printf("UART: %i",ll);
-		ll++;
-	};
+	rcvuart = HAL_UART_Receive(&huart1, UserRxBufferFS, APP_RX_DATA_SIZE,220);
+//rcvuart = HAL_UART_Receive_IT(&huart1, UserRxBufferFS, APP_RX_DATA_SIZE); //
+//rcvuart = HAL_UART_Receive_DMA(&huart1, UserRxBufferFS, APP_RX_DATA_SIZE);  /// enable circular mode
 
-
-
-//	if( HAL_UART_Receive_DMA(&huart1, UserRxBufferFS, APP_RX_DATA_SIZE) == HAL_OK )
- //if (HAL_UART_Receive_IT(&huart1, UserRxBufferFS, APP_RX_DATA_SIZE) == HAL_OK )
-//	if( HAL_UART_Receive(&huart1, UserRxBufferFS, APP_RX_DATA_SIZE,100) == HAL_OK )
-		{
-//		rcvuart=1;
-		// HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-		}
-//	else
-//		rcvuart=0;
-		//HAL_UART_Receive_IT(&huart1, UserRxBufferFS, APP_RX_DATA_SIZE+1);
+		if (++ll>2) { HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);ll=0;}
 }
-
 
 
 
@@ -618,6 +558,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Channel3_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);
+  /* DMA1_Channel5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 
 }
 
