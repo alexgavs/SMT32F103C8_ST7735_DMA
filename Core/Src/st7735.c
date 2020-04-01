@@ -21,6 +21,12 @@
 #define ST7735_COLOR565(r, g, b) (((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3))
 #define SWAP_INT16_T(a, b) { int16_t t = a; a = b; b = t; }
 #define DELAY 0x80
+#define putpix(c) { uint8_t data[]={(c>>8),(c & 0xFF)}; ST7735_WriteDataL(data);}
+
+//                uint8_t data[] = { bgcolor >> 8, bgcolor & 0xFF };
+//                ST7735_WriteData(data, sizeof(data));
+//                (c >> 8); ST7735_WriteDataL(c & 0xFF); }
+
 
 #if defined(ST7735_1_8_DEFAULT_ORIENTATION) || defined(ST7735S_1_8_DEFAULT_ORIENTATION)
 static uint8_t _data_rotation[4] = { ST7735_MADCTL_MX, ST7735_MADCTL_MY, ST7735_MADCTL_MV, ST7735_MADCTL_RGB };
@@ -116,6 +122,7 @@ init_cmds3[] = {            		// Init for 7735R, part 3 (red or green tab)
 
 static void ST7735_GPIO_Init(void);
 static void ST7735_WriteCommand(uint8_t cmd);
+static void ST7735_WriteDataL(uint8_t* buff);
 static void ST7735_WriteData(uint8_t* buff, size_t buff_size);
 static void ST7735_ExecuteCommandList(const uint8_t *addr);
 static void ST7735_SetAddressWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1);
@@ -123,20 +130,20 @@ static void ST7735_WriteChar(uint16_t x, uint16_t y, char ch, FontDef font, uint
 
 static void ST7735_GPIO_Init(void)
 {
-//	GPIO_InitTypeDef GPIO_InitStruct = {0};
-//
-//	/* GPIO Ports Clock Enable */
-//	__HAL_RCC_GPIOB_CLK_ENABLE();
-//
-//	/*Configure GPIO pin Output Level */
-//	HAL_GPIO_WritePin(GPIOB, ST7735_RES_Pin|ST7735_DC_Pin|ST7735_CS_Pin|ST7735_BL_Pin, GPIO_PIN_RESET);
-//
-//	/*Configure GPIO pins : ST7735_RES_Pin ST7735_DC_Pin ST7735_CS_Pin ST7735_BL_Pin */
-//	GPIO_InitStruct.Pin = ST7735_RES_Pin|ST7735_DC_Pin|ST7735_CS_Pin|ST7735_BL_Pin;
-//	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-//	GPIO_InitStruct.Pull = GPIO_NOPULL;
-//	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-//	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+	/* GPIO Ports Clock Enable */
+	__HAL_RCC_GPIOB_CLK_ENABLE();
+
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(ST7735_RES_GPIO_Port, ST7735_RES_Pin|ST7735_DC_Pin|ST7735_CS_Pin|ST7735_BL_Pin, GPIO_PIN_RESET);
+
+	/*Configure GPIO pins : ST7735_RES_Pin ST7735_DC_Pin ST7735_CS_Pin ST7735_BL_Pin */
+	GPIO_InitStruct.Pin = ST7735_RES_Pin|ST7735_DC_Pin|ST7735_CS_Pin|ST7735_BL_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 }
 
 static void ST7735_Reset()
@@ -148,13 +155,13 @@ static void ST7735_Reset()
 
 static void ST7735_WriteCommand(uint8_t cmd)
 {
-	TFT_DC_C();
+	TFT_DC_C(); //HAL_GPIO_WritePin(ST7735_DC_GPIO_Port, ST7735_DC_Pin, GPIO_PIN_RESET);
 // было удалено передача по DMA
 //
 #ifdef USE_SPI_DMA
 //  int completed1 = 0;
 	HAL_SPI_Transmit_DMA(&ST7735_SPI_PORT, &cmd, sizeof(cmd));
-	//while(ST7735_SPI_PORT.State == HAL_SPI_STATE_BUSY_TX); //stop
+	while(ST7735_SPI_PORT.State == HAL_SPI_STATE_BUSY_TX); //stop
 #else
 	HAL_SPI_Transmit(&ST7735_SPI_PORT, &cmd, sizeof(cmd), HAL_MAX_DELAY);
 	//HAL_SPI_Transmit_IT(&ST7735_SPI_PORT, &cmd, sizeof(cmd));
@@ -165,12 +172,20 @@ static void ST7735_WriteCommand(uint8_t cmd)
 
 }
 
+static void ST7735_WriteDataL(uint8_t* data)
+{
+    // uint8_t data[] = { bgcolor >> 8, bgcolor & 0xFF };
+    ST7735_WriteData(data, sizeof(data));
+
+}
+
+
 static void ST7735_WriteData(uint8_t* buff, size_t buff_size)
 {
-	TFT_DC_D();
+	TFT_DC_D(); //HAL_GPIO_WritePin(ST7735_DC_GPIO_Port, ST7735_DC_Pin, GPIO_PIN_SET);
 #ifdef USE_SPI_DMA
 	HAL_SPI_Transmit_DMA(&ST7735_SPI_PORT, buff, buff_size);
-	while(ST7735_SPI_PORT.State == HAL_SPI_STATE_BUSY_TX);
+		while(ST7735_SPI_PORT.State == HAL_SPI_STATE_BUSY_TX);
 #else
 	HAL_SPI_Transmit(&ST7735_SPI_PORT, buff, buff_size, HAL_MAX_DELAY);
 #endif
@@ -265,11 +280,10 @@ void ST7735_DrawPixel(uint16_t x, uint16_t y, uint16_t color)
         return;
 
     TFT_CS_L();
-
     ST7735_SetAddressWindow(x, y, x+1, y+1);
-    uint8_t data[] = { color >> 8, color & 0xFF };
-    ST7735_WriteData(data, sizeof(data));
-
+//    uint8_t data[] = { color >> 8, color & 0xFF };
+//    ST7735_WriteData(data, sizeof(data));
+    putpix(color);
     TFT_CS_H();
 }
 
@@ -805,6 +819,7 @@ void ST7735_DrawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color)
 
   #ifdef USE_SPI_DMA
   ST7735_FillRectangle(x, y, 1, h, color);
+  //ST7735_DrawLine(x, y, x, y + h - 1, color);
   #else
   ST7735_DrawLine(x, y, x, y + h - 1, color);
   #endif
@@ -823,6 +838,7 @@ void ST7735_DrawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color)
 
   #ifdef USE_SPI_DMA
   ST7735_FillRectangle(x, y, w, 1, color);
+  //ST7735_DrawLine(x, y, x + w - 1, y, color);
   #else
   ST7735_DrawLine(x, y, x + w - 1, y, color);
   #endif
@@ -845,7 +861,8 @@ void ST7735_SetRotation(uint8_t m)
     case 0:
     {
     	uint8_t d_r = (_data_rotation[0] | _data_rotation[1] | _data_rotation[3]);
-    	ST7735_WriteData(&d_r, sizeof(d_r));
+    	//ST7735_WriteData(&d_r, sizeof(d_r));
+    	ST7735_WriteDataL(&d_r);
         _width  = ST7735_WIDTH;
         _height = ST7735_HEIGHT;
         _xstart = ST7735_XSTART;
@@ -855,7 +872,8 @@ void ST7735_SetRotation(uint8_t m)
     case 1:
     {
     	uint8_t d_r = (_data_rotation[1] | _data_rotation[2] | _data_rotation[3]);
-    	ST7735_WriteData(&d_r, sizeof(d_r));
+    	//ST7735_WriteData(&d_r, sizeof(d_r));
+    	ST7735_WriteDataL(&d_r);
     	_width  = ST7735_HEIGHT;
     	_height = ST7735_WIDTH;
     	_xstart = ST7735_YSTART;
@@ -865,7 +883,7 @@ void ST7735_SetRotation(uint8_t m)
     case 2:
     {
     	uint8_t d_r = _data_rotation[3];
-    	ST7735_WriteData(&d_r, sizeof(d_r));
+    	ST7735_WriteDataL(&d_r); //, sizeof(d_r));
     	_width  = ST7735_WIDTH;
     	_height = ST7735_HEIGHT;
     	_xstart = ST7735_XSTART;
@@ -875,7 +893,8 @@ void ST7735_SetRotation(uint8_t m)
     case 3:
     {
     	uint8_t d_r = (_data_rotation[0] | _data_rotation[2] | _data_rotation[3]);
-    	ST7735_WriteData(&d_r, sizeof(d_r));
+    	// ST7735_WriteData(&d_r, sizeof(d_r));
+    	ST7735_WriteDataL(&d_r);
     	_width  = ST7735_HEIGHT;
     	_height = ST7735_WIDTH;
     	_xstart = ST7735_YSTART;

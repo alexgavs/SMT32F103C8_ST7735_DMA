@@ -111,14 +111,20 @@ extern SPI_HandleTypeDef ST7735_SPI_PORT;
 #define ST7735_GMCTRN1 0xE1
 
 // Color definitions
-#define	ST7735_BLACK   0x0000
-#define	ST7735_BLUE    0x001F
-#define	ST7735_RED     0xF800
-#define	ST7735_GREEN   0x07E0
-#define ST7735_CYAN    0x07FF
-#define ST7735_MAGENTA 0xF81F
-#define ST7735_YELLOW  0xFFE0
-#define ST7735_WHITE   0xFFFF
+#define	ST7735_BLACK   		0x0000 //
+#define	ST7735_BLUE    		0x001F //31
+#define	ST7735_RED     		0xF800 //63488
+#define	ST7735_GREEN   		0x07E0 //2016
+#define ST7735_CYAN    		0x07FF
+#define ST7735_MAGENTA 		0xF81F
+#define ST7735_YELLOW  		0xFFE0
+#define ST7735_WHITE   		0xFFFF
+#define ST7735_LIGHT_GRAY 	0xBDF7
+#define ST7735_DARK_GRAY	0x7BEF
+#define ST7735_ORANGE 		0xFBE0
+#define ST7735_BROWN		0x79E0
+#define ST7735_PINK			0xF81F
+
 
 void ST7735_Backlight_On(void);
 void ST7735_Backlight_Off(void);
