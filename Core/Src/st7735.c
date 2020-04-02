@@ -9,10 +9,19 @@
 #include "st7735.h"
 #include "stdlib.h"
 
+
 #define TFT_BL_H()	ST7735_BL_GPIO_Port -> BSRR = ST7735_BL_Pin
 #define TFT_BL_L()	ST7735_BL_GPIO_Port -> BRR 	= ST7735_BL_Pin
+
+#ifdef USE_CS_PIN
 #define TFT_CS_H()	ST7735_CS_GPIO_Port -> BSRR = ST7735_CS_Pin
 #define TFT_CS_L()	ST7735_CS_GPIO_Port -> BRR 	= ST7735_CS_Pin
+#else
+#define TFT_CS_H()
+#define TFT_CS_L()
+#endif
+
+
 #define TFT_DC_D()	ST7735_DC_GPIO_Port -> BSRR = ST7735_DC_Pin
 #define TFT_DC_C()	ST7735_DC_GPIO_Port -> BRR 	= ST7735_DC_Pin
 #define TFT_RES_H()	ST7735_RES_GPIO_Port -> BSRR = ST7735_RES_Pin
@@ -156,6 +165,7 @@ static void ST7735_Reset()
 static void ST7735_WriteCommand(uint8_t cmd)
 {
 	TFT_DC_C(); //HAL_GPIO_WritePin(ST7735_DC_GPIO_Port, ST7735_DC_Pin, GPIO_PIN_RESET);
+	TFT_CS_L();
 // было удалено передача по DMA
 //
 #ifdef USE_SPI_DMA
@@ -167,8 +177,7 @@ static void ST7735_WriteCommand(uint8_t cmd)
 	//HAL_SPI_Transmit_IT(&ST7735_SPI_PORT, &cmd, sizeof(cmd));
 
 #endif
-
-
+	TFT_CS_H();
 
 }
 
@@ -183,12 +192,14 @@ static void ST7735_WriteDataL(uint8_t* data)
 static void ST7735_WriteData(uint8_t* buff, size_t buff_size)
 {
 	TFT_DC_D(); //HAL_GPIO_WritePin(ST7735_DC_GPIO_Port, ST7735_DC_Pin, GPIO_PIN_SET);
+	TFT_CS_L();
 #ifdef USE_SPI_DMA
 	HAL_SPI_Transmit_DMA(&ST7735_SPI_PORT, buff, buff_size);
 		while(ST7735_SPI_PORT.State == HAL_SPI_STATE_BUSY_TX);
 #else
 	HAL_SPI_Transmit(&ST7735_SPI_PORT, buff, buff_size, HAL_MAX_DELAY);
 #endif
+	TFT_CS_H();
 }
 
 static void ST7735_ExecuteCommandList(const uint8_t *addr)
@@ -378,6 +389,17 @@ void ST7735_InvertColors(bool invert)
     ST7735_WriteCommand(invert ? ST7735_INVON : ST7735_INVOFF);
     TFT_CS_H();
 }
+
+//==============================================================================
+// Процедура включения/отключения питания дисплея
+//==============================================================================
+void ST7735_DisplayPower(uint8_t On)
+{
+		TFT_CS_L();
+	    ST7735_WriteCommand(On ? ST7735_DISPON : ST7735_DISPOFF);
+	    TFT_CS_H();
+}
+//==============================================================================
 
 void ST7735_Backlight_On(void)
 {

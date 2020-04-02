@@ -13,10 +13,14 @@
 
 #define MC6000_crc_port 	hcrc	//hspi1, hspi2, hspi3...
 #define MC6000_huart1		huart1
+#define MC6000_hiwdg		hiwdg
+
+
 
 extern UART_HandleTypeDef MC6000_huart1;
-extern CRC_HandleTypeDef MC6000_crc_port;
-
+extern CRC_HandleTypeDef  MC6000_crc_port;
+extern CRC_HandleTypeDef  MC6000_crc_port;
+extern IWDG_HandleTypeDef MC6000_hiwdg;
 
 
 void border_blue(uint16_t color );

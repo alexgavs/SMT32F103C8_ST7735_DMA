@@ -7,20 +7,25 @@
 
 #include "st7735.h"
 #include "mc6000.h"
-
+#include "xprintf.h"
 
 #define APP_RX_DATA_SIZE 20
 #define APP_TX_DATA_SIZE 20
+#define CDC_TX_DATA_SIZE 80
+
 #define START_BYTE 		90 // 0x5A
 
 uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
+uint8_t CDCTxBufferFS[CDC_TX_DATA_SIZE];
+uint8_t firstrun;
+
 uint16_t SizeBufferRX;
 int32_t pcnt;
 int32_t pcnt2;
 uint32_t crcRX,crcTX;
 
-volatile float batf,bank4f,bank3f,bank2f,bank1f;
+float batf,bank4f,bank3f,bank2f,bank1f;
 uint8_t _rxstat;
 uint8_t _txstat;
 volatile uint16_t border_color; // =ST7735_BLUE;
@@ -86,11 +91,12 @@ void printbankd(char* bankname, const uint16_t t1, uint16_t t2, FontDef font, ui
 sprintf((char*) strtxt,"%s:%d  :%d",(char*)bankname, t1,t2);
 printbankln((char*)strtxt, font, color, bgcolor);
 }
-void printbankf(char* bankname, const float voltage, FontDef font, uint16_t color, uint16_t bgcolor)
+void printbankf(char* bankname, float voltage, FontDef font, uint16_t color, uint16_t bgcolor)
 {
 uint16_t b1=(uint16_t) voltage;
 uint16_t b2=(uint16_t) ((float)(voltage-b1)*1000);
-sprintf(strtxt,"%s:   %2d.%3d ",(char *) bankname, (uint16_t) b1, (uint16_t) b2);
+//sprintf(strtxt,"%s:   %2d.%3d ",(char *) bankname, (uint16_t) b1, (uint16_t) b2);
+sprintf((char*) strtxt,"%s:  %s %-02.2f ",(char *) bankname, (char*) ((voltage<10)?"  ":" "), (float) voltage);
 printbankln(strtxt, font, color, bgcolor);
 }
 void printbankh(const uint8_t* data, const FontDef font, const uint16_t color, uint16_t bgcolor)
@@ -143,7 +149,7 @@ _c=1;
 _r=1;
 
 border_blue(border_color);
-printbankd("ERR", (int) pcnt, (int)pcnt2, Font_7x10, ST7735_RED, ST7735_BLACK);_c=1;
+printbankd("ERR", (int) pcnt, (int)pcnt2, Font_8x9, ST7735_RED, ST7735_BLACK);_c=1;
 sprintf(strtxt,"CRC  : %8X", (uint32_t) HAL_CRC_Calculate(&MC6000_crc_port, UserRxBufferFS, APP_RX_DATA_SIZE));
 printbankln((char*) strtxt, Font_7x10, ST7735_GREEN, ST7735_BLACK);
 
@@ -213,6 +219,45 @@ printbankh((uint8_t)UserRxBufferFS[20], Font_7x10, ST7735_LIGHT_GRAY, ST7735_BLA
 
 }
 }
+
+
+void pf(float voltage, float bb4, float bb3, float bb2, float bb1)
+{
+
+uint16_t b0=(uint16_t) voltage;
+uint16_t f0=(uint16_t) ((float)(voltage-b0)*1000);
+
+uint16_t b1=(uint16_t) bb1;
+uint16_t f1=(uint16_t) ((float)(bb1-b1)*1000);
+
+uint16_t b2=(uint16_t) bb2;
+uint16_t f2=(uint16_t) ((float)(bb2-b2)*1000);
+
+uint16_t b3=(uint16_t) bb3;
+uint16_t f3=(uint16_t) ((float)(bb3-b3)*1000);
+
+uint16_t b4=(uint16_t) bb4;
+uint16_t f4=(uint16_t) ((float)(bb4-b4)*1000);
+
+
+//sprintf((char*) CDCTxBufferFS, "%s %-.3f, %s %-.3f, %s %-.3f, %s %-.3f, %s %-.3f\n",// %s %2d.%3d, %s %2d.%3d",
+//					"volt",	 voltage,		//(uint16_t) b0, (uint16_t) f0,
+//					"bank1", bb1,			//(uint16_t) b1, (uint16_t) f1,
+//					"bank2", bb2,			//(uint16_t) b2, (uint16_t) f2,
+//					"bank3", bb3,			//(uint16_t) b3, (uint16_t) f3,
+//					"bank4", bb4);			//(uint16_t) b4, (uint16_t) f4);
+
+sprintf((char*) CDCTxBufferFS, "%-.3f\t%-.3f\t%-.3f\t%-.3f\t%-.3f\n",// %s %2d.%3d, %s %2d.%3d",
+					 voltage,		//(uint16_t) b0, (uint16_t) f0,
+					 bb1,			//(uint16_t) b1, (uint16_t) f1,
+					 bb2,			//(uint16_t) b2, (uint16_t) f2,
+					 bb3,			//(uint16_t) b3, (uint16_t) f3,
+					 bb4);			//(uint16_t) b4, (uint16_t) f4);
+
+
+
+}
+
 void calcBattery(void)
 {
 int8_t shiftAddress=-1;
@@ -222,18 +267,33 @@ int8_t shiftAddress=-1;
 	  bank3f= (((UserRxBufferFS[15+shiftAddress]<<8) | UserRxBufferFS[14+shiftAddress]) / 58.4);
 	  bank2f= (((UserRxBufferFS[17+shiftAddress]<<8) | UserRxBufferFS[16+shiftAddress]) / 57.4);
 	  bank1f= (((UserRxBufferFS[19+shiftAddress]<<8) | UserRxBufferFS[18+shiftAddress]) / 58.1);
+
+	  pf(batf,bank1f,bank2f,bank3f,bank4f);
+
    }
 
 
 }
 void readUART(void)
 {
+
 	border_color=ST7735_BLUE;
     _rxstat= HAL_UART_Receive_DMA(&MC6000_huart1, UserRxBufferFS, APP_RX_DATA_SIZE);
     if (!_rxstat==0) {pcnt++; clearBuffer();}
+    HAL_IWDG_Refresh(&MC6000_hiwdg);
 }
+
+
+
 void writeUART(void)
 {
+	if (firstrun==1) {
+		 sprintf((char*) CDCTxBufferFS, "voltage, bank1, bank2, bank3, bank4\n");
+		  CDC_Transmit_FS(CDCTxBufferFS, strlen(CDCTxBufferFS));
+	}
+
+firstrun++; if (firstrun >5) firstrun=0;
+
 	if (UserRxBufferFS[0]==START_BYTE)
 		{
 			border_color=ST7735_YELLOW;
@@ -241,9 +301,14 @@ void writeUART(void)
 			UserTxBufferFS[APP_RX_DATA_SIZE-1]='\n';
 			_txstat = HAL_UART_Transmit_DMA(&MC6000_huart1, UserRxBufferFS, APP_RX_DATA_SIZE);    blink();
 				if (!_txstat==0) pcnt2++;
- 	 		CDC_Transmit_FS(UserRxBufferFS, APP_RX_DATA_SIZE);
-		}
+				  CDC_Transmit_FS(CDCTxBufferFS, strlen(CDCTxBufferFS));
+	}
+
+	HAL_IWDG_Refresh(&MC6000_hiwdg);
 }
+
+
+
 void clearBuffer(void)
 {
 	for (uint8_t t=0; t<=APP_RX_DATA_SIZE; t++) UserRxBufferFS[t]=0; //clear buffer
